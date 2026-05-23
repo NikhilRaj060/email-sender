@@ -17,4 +17,8 @@ router.post("/retry", verifyToken, emailControler.retryFailedEmails);
 // GET /email/stats/daily
 router.get("/stats/daily", verifyToken, emailControler.getDailyEmailStats);
 
+// ─── Bulk Job tracking routes ──────────────────────────────────────────────────
+router.get("/job/latest", verifyToken, emailControler.getLatestBulkJob);
+router.get("/job/:jobId", verifyToken, emailControler.getBulkJobStatus);
+
 module.exports = router;

@@ -27,4 +27,14 @@ export const emailService = {
     const { data } = await api.get("/api/email/stats/daily");
     return data;
   },
+
+  async getLatestJob(): Promise<any> {
+    const { data } = await api.get("/api/email/job/latest");
+    return data;
+  },
+
+  async getJobStatus(jobId: string): Promise<any> {
+    const { data } = await api.get(`/api/email/job/${jobId}`);
+    return data;
+  },
 };

@@ -7,6 +7,29 @@ const logger = require('morgan');
 require('dotenv').config();
 require('./config/db')();
 
+// Initialize RMQ, Redis, and workers
+const redisService = require('./services/redisService');
+const queueService = require('./services/queueService');
+const emailWorker = require('./workers/emailWorker');
+
+(async () => {
+  try {
+    await redisService.connectRedis();
+    await queueService.connectQueue();
+    
+    // Purge stale messages from previous killed runs for all registered users
+    const User = require('./models/User');
+    const users = await User.find({}, "_id");
+    for (const user of users) {
+      await queueService.purgeUserQueue(user._id);
+    }
+
+    await emailWorker.startWorker();
+  } catch (err) {
+    console.error('❌ Failed to initialize background services on startup:', err);
+  }
+})();
+
 const indexRouter = require('./routes/index');
 const usersRouter = require('./routes/users');
 const emailRouter = require('./routes/emailRoutes');

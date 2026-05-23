@@ -21,6 +21,10 @@ app.set('port', port);
 
 var server = http.createServer(app);
 
+// Initialize Socket.IO
+var socketService = require('../services/socketService');
+socketService.init(server);
+
 /**
  * Listen on provided port, on all network interfaces.
  */
