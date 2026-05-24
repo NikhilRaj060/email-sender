@@ -7,10 +7,22 @@ const assertedQueues = new Set();
 
 const connectQueue = async () => {
   try {
-    connection = await amqp.connect(process.env.RABBITMQ_URL || "amqp://localhost:5672");
+
+    if (!process.env.RABBITMQ_URL) {
+      console.log("⚠️ RABBITMQ_URL not configured. Skipping RabbitMQ connection.");
+      return;
+    }
+
+    connection = await amqp.connect(process.env.RABBITMQ_URL);
+
     channel = await connection.createChannel();
-    await channel.assertQueue(QUEUE_NAME, { durable: true });
-    console.log("🐇 RabbitMQ connected successfully");
+
+    await channel.assertQueue(QUEUE_NAME, {
+      durable: true,
+    });
+
+    console.log("✅ RabbitMQ connected successfully");
+
   } catch (err) {
     console.error("❌ RabbitMQ connection failed:", err);
   }
