@@ -296,7 +296,7 @@ export default function SendPage() {
               </div>
 
               {/* Campaign Status Counters */}
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 12 }}>
+              <div className="active-job-stats-grid" style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 12 }}>
                 {[
                   { label: "Total", value: activeJob.totalCount || 0, color: "var(--text-primary)" },
                   { label: "Sent", value: activeJob.sentCount || 0, color: "#34d399" },

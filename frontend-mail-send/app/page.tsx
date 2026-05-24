@@ -72,6 +72,7 @@ function MockDashboard() {
         borderRadius: "var(--r-2xl)",
         overflow: "hidden",
         boxShadow: "0 32px 80px -20px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.04)",
+        minWidth: 640,
       }}
     >
       {/* Titlebar */}
@@ -200,7 +201,7 @@ export default function LandingPage() {
       </nav>
 
       {/* Hero */}
-      <section style={{ padding:"100px 32px 80px", textAlign:"center", position:"relative" }}>
+      <section style={{ padding:"clamp(60px, 12vw, 100px) clamp(16px, 4vw, 32px) clamp(48px, 10vw, 80px)", textAlign:"center", position:"relative" }}>
         <motion.div
           initial={{ opacity:0, y:24 }}
           animate={{ opacity:1, y:0 }}
@@ -239,7 +240,7 @@ export default function LandingPage() {
           initial={{ opacity:0, y:48, scale:0.97 }}
           animate={{ opacity:1, y:0, scale:1 }}
           transition={{ duration:0.9, delay:0.25, ease:[0.4,0,0.2,1] }}
-          style={{ maxWidth:860, margin:"64px auto 0", position:"relative" }}
+          style={{ maxWidth:860, margin:"64px auto 0", position:"relative", width:"100%", overflowX:"auto" }}
         >
           {/* Glow beneath */}
           <div style={{
@@ -252,7 +253,7 @@ export default function LandingPage() {
       </section>
 
       {/* How it works */}
-      <section style={{ padding:"80px 32px", borderTop:"1px solid var(--border-subtle)" }}>
+      <section style={{ padding:"clamp(48px, 8vw, 80px) clamp(16px, 4vw, 32px)", borderTop:"1px solid var(--border-subtle)" }}>
         <div className="container">
           <div style={{ textAlign:"center", marginBottom:56 }}>
             <p style={{ color:"var(--text-accent)", fontSize:13, fontWeight:500, letterSpacing:"0.08em", textTransform:"uppercase", marginBottom:12 }}>
@@ -289,7 +290,7 @@ export default function LandingPage() {
       </section>
 
       {/* Features */}
-      <section style={{ padding:"80px 32px", borderTop:"1px solid var(--border-subtle)" }}>
+      <section style={{ padding:"clamp(48px, 8vw, 80px) clamp(16px, 4vw, 32px)", borderTop:"1px solid var(--border-subtle)" }}>
         <div className="container">
           <div style={{ textAlign:"center", marginBottom:56 }}>
             <p style={{ color:"var(--text-accent)", fontSize:13, fontWeight:500, letterSpacing:"0.08em", textTransform:"uppercase", marginBottom:12 }}>
@@ -330,12 +331,12 @@ export default function LandingPage() {
       </section>
 
       {/* CTA */}
-      <section style={{ padding:"80px 32px", borderTop:"1px solid var(--border-subtle)" }}>
+      <section style={{ padding:"clamp(48px, 8vw, 80px) clamp(16px, 4vw, 32px)", borderTop:"1px solid var(--border-subtle)" }}>
         <div style={{ maxWidth:600, margin:"0 auto", textAlign:"center" }}>
           <div
             className="card"
             style={{
-              padding:"56px 48px",
+              padding:"clamp(32px, 6vw, 56px) clamp(20px, 6vw, 48px)",
               background:"linear-gradient(135deg, rgba(124,58,237,0.08) 0%, rgba(79,70,229,0.06) 100%)",
               border:"1px solid var(--border-accent)",
               boxShadow:"0 0 80px -30px rgba(124,58,237,0.3)",
@@ -358,7 +359,7 @@ export default function LandingPage() {
       {/* Footer */}
       <footer style={{
         borderTop:"1px solid var(--border-subtle)",
-        padding:"28px 32px",
+        padding:"28px clamp(16px, 4vw, 32px)",
         display:"flex", alignItems:"center", justifyContent:"space-between", flexWrap:"wrap", gap:16,
       }}>
         <div style={{ display:"flex", alignItems:"center", gap:10 }}>

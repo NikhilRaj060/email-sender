@@ -4,7 +4,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import {
   LayoutDashboard, Send, FileText, BarChart3,
-  Settings, LogOut, Mail, FileUp,
+  Settings, LogOut, Mail, FileUp, X,
 } from "lucide-react";
 import { useAuthStore } from "@/store/authStore";
 import { authService } from "@/services/authService";
@@ -23,13 +23,20 @@ function getInitials(name: string) {
   return name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2);
 }
 
-export default function Sidebar() {
+interface SidebarProps {
+  readonly isOpen?: boolean;
+  readonly onClose?: () => void;
+}
+
+export default function Sidebar({ isOpen, onClose }: SidebarProps) {
   const pathname  = usePathname();
   const router    = useRouter();
   const { userName, logout } = useAuthStore();
 
   const handleLogout = async () => {
-    try { await authService.logout(); } finally {
+    try { 
+      await authService.logout(); 
+    } finally {
       logout();
       toast.success("Logged out");
       router.replace("/login");
@@ -37,31 +44,42 @@ export default function Sidebar() {
   };
 
   return (
-    <aside style={{
-      width:220, minHeight:"100vh", flexShrink:0,
-      background:"var(--bg-surface)",
-      borderRight:"1px solid var(--border-subtle)",
-      display:"flex", flexDirection:"column",
-      position:"sticky", top:0, height:"100vh", overflow:"auto",
-    }}>
-      {/* Logo */}
+    <aside className={`sidebar ${isOpen ? "open" : ""}`}>
+      {/* Logo & Close Button */}
       <div style={{
         padding:"18px 20px",
         borderBottom:"1px solid var(--border-subtle)",
-        display:"flex", alignItems:"center", gap:10,
+        display:"flex", alignItems:"center", justifyContent:"space-between",
+        width: "100%",
+        flexShrink: 0,
       }}>
-        <div style={{
-          width:28, height:28, borderRadius:7,
-          background:"linear-gradient(135deg, #7c3aed, #4f46e5)",
-          display:"flex", alignItems:"center", justifyContent:"center",
-          boxShadow:"0 3px 10px rgba(124,58,237,0.35)",
-          flexShrink:0,
-        }}>
-          <Mail size={13} color="#fff" />
+        <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+          <div style={{
+            width:28, height:28, borderRadius:7,
+            background:"linear-gradient(135deg, #7c3aed, #4f46e5)",
+            display:"flex", alignItems:"center", justifyContent:"center",
+            boxShadow:"0 3px 10px rgba(124,58,237,0.35)",
+            flexShrink:0,
+          }}>
+            <Mail size={13} color="#fff" />
+          </div>
+          <span style={{ color:"var(--text-primary)", fontWeight:600, fontSize:14.5, letterSpacing:"-0.02em" }}>
+            MailFlow
+          </span>
         </div>
-        <span style={{ color:"var(--text-primary)", fontWeight:600, fontSize:14.5, letterSpacing:"-0.02em" }}>
-          MailFlow
-        </span>
+        {onClose && (
+          <button
+            onClick={onClose}
+            className="mobile-close-btn"
+            style={{
+              background:"none", border:"none", cursor:"pointer",
+              color:"var(--text-muted)", padding:4, display:"flex",
+              alignItems:"center", justifyContent:"center", borderRadius:6,
+            }}
+          >
+            <X size={16} />
+          </button>
+        )}
       </div>
 
       {/* Navigation */}
@@ -72,7 +90,7 @@ export default function Sidebar() {
           const active = exact ? pathname === "/dashboard" : pathname.startsWith(item.href);
 
           return (
-            <Link key={item.href} href={item.href} style={{ textDecoration:"none" }}>
+            <Link key={item.href} href={item.href} style={{ textDecoration:"none" }} onClick={onClose}>
               <motion.div
                 whileHover={{ x: 1 }}
                 style={{
@@ -120,8 +138,8 @@ export default function Sidebar() {
         })}
       </nav>
 
-      {/* User */}
-      <div style={{ padding:"10px", borderTop:"1px solid var(--border-subtle)" }}>
+      {/* User Info & Logout */}
+      <div style={{ padding:"10px", borderTop:"1px solid var(--border-subtle)", flexShrink: 0 }}>
         <div style={{
           display:"flex", alignItems:"center", gap:9,
           padding:"9px 11px", borderRadius:"var(--r-md)",
