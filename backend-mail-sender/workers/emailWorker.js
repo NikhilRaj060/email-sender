@@ -35,6 +35,10 @@ const startUserWorker = async (userId) => {
     activeUserWorkers.add(userIdStr);
     console.log(`👷 Dedicated email worker started for user: ${userIdStr} on queue: ${queueName}`);
 
+    // Track active campaign job to load resume exactly once per campaign
+    let currentJobId = null;
+    let cachedResume = null;
+
     userChannel.consume(queueName, async (msg) => {
       if (!msg) return;
 
@@ -63,8 +67,14 @@ const startUserWorker = async (userId) => {
         // 1. Tiny stagger delay to prevent SMTP burst connections
         await new Promise((resolve) => setTimeout(resolve, 10));
 
-        // 2. Fetch user resume and pooled transporter (sequentially shared connection)
-        const resume = await getResumeForUser(userIdStr);
+        // 2. Fetch user resume once per campaign (sequentially shared connection)
+        if (jobId !== currentJobId) {
+          console.log(`📄 [User:${userIdStr}] New job detected (${jobId}). Fetching fresh resume once...`);
+          currentJobId = jobId;
+          cachedResume = await getResumeForUser(userIdStr);
+        }
+        const resume = cachedResume;
+
         const { transporter, fromEmail } = await getTransporterForUser(userIdStr);
 
         // Fetch dynamic progress from Redis or database fallback for logging
@@ -172,7 +182,7 @@ const startUserWorker = async (userId) => {
         userChannel.ack(msg);
       } catch (err) {
         console.error(`❌ Worker error processing email to ${email}:`, err);
-        
+
         try {
           const updatedProgress = await redisService.updateJobProgress(jobId, "FAILED");
           const bulkJob = await BulkJob.findById(jobId);

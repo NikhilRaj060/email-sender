@@ -14,6 +14,7 @@ const EmailLog = require("../models/EmailLog");
 const Template = require("../models/Template");
 const { getTransporterForUser } = require("../config/mailTransport");
 const emailWorker = require("../workers/emailWorker");
+const socketService = require("../services/socketService");
 
 const sendBulkEmails = async (req, res, next) => {
   const userId = req.currentUserId;
@@ -24,31 +25,11 @@ const sendBulkEmails = async (req, res, next) => {
       return res.status(400).json({ message: "PDF missing" });
     }
 
-    console.log(`📄 [User:${userId}] Received PDF of size ${(req.file.buffer.length / 1024).toFixed(1)}KB. Running extraction...`);
-    // 1. Call the service to do the extraction and file creation
-    const filePath = await processPdfToExcel(req.file.buffer);
-    console.log(`📝 [User:${userId}] Extracted PDF data to temporary file: ${filePath}`);
-
-    // 2. Read from the newly created XLSX
-    const hrList = readHRExcel(filePath);
-    console.log(`👥 [User:${userId}] Parsed contact list. Found ${hrList.length} HR contacts.`);
-
-    if (hrList.length === 0) {
-      console.warn(`⚠️ [User:${userId}] No valid HR contacts found in the parsed Excel sheet.`);
-      safeDelete(filePath);
-      return res.status(400).json({ message: "No valid HR contacts found in PDF" });
-    }
-
-    // Ensure the dynamic per-user sequential worker is started and listening
-    console.log(`👷 [User:${userId}] Checking if user worker is active...`);
-    await emailWorker.startUserWorker(userId);
-
     console.log(`🔎 [User:${userId}] Verifying user resume status...`);
     const resume = await getResumeForUser(userId);
 
     if (!resume) {
       console.error(`❌ [User:${userId}] Campaign aborted: No resume uploaded or resume missing from database.`);
-      safeDelete(filePath);
       return res.status(422).json({
         message: "Please upload your resume before sending emails",
       });
@@ -68,7 +49,6 @@ const sendBulkEmails = async (req, res, next) => {
 
     if (!template) {
       console.error(`❌ [User:${userId}] Campaign aborted: No valid email template found.`);
-      safeDelete(filePath);
       return res.status(422).json({
         message: "Please upload at least one email template before sending",
       });
@@ -79,8 +59,8 @@ const sendBulkEmails = async (req, res, next) => {
     // 3. Create persistent campaign Job record in MongoDB
     const bulkJob = new BulkJob({
       userId,
-      totalCount: hrList.length,
-      pendingCount: hrList.length,
+      totalCount: 0,
+      pendingCount: 0,
       status: "PENDING",
       templateId: template._id,
       templateName: template.name,
@@ -88,69 +68,134 @@ const sendBulkEmails = async (req, res, next) => {
     await bulkJob.save();
     console.log(`💾 [User:${userId}] Created BulkJob in MongoDB. Job ID: ${bulkJob._id}`);
 
-    // 4. Initialize Redis cache tracking state
-    await redisService.initJobProgress(bulkJob._id.toString(), {
-      totalCount: hrList.length,
-      status: "PENDING",
-    });
-    console.log(`🔋 [User:${userId}] Initialized Redis progress tracking for Job: ${bulkJob._id}`);
-
-    const getRandomSubject = () => {
-      const subjects = Array.isArray(template.subjects)
-        ? template.subjects.filter(Boolean)
-        : [];
-      if (subjects.length === 0) {
-        return template.name || "Job Opportunity";
-      }
-      const randomIndex = Math.floor(Math.random() * subjects.length);
-      return subjects[randomIndex];
-    };
-
-    // 5. Enqueue each contact email task on RabbitMQ queue
-    console.log(`📥 [User:${userId}] Enqueuing ${hrList.length} contact emails to RabbitMQ...`);
-    let enqueuedCount = 0;
-    for (const hr of hrList) {
-      if (!hr.email) {
-        console.warn(`⏭️ [User:${userId}] Skipping HR contact (missing email):`, hr.name || "Unknown");
-        continue;
-      }
-      const rawSubject = getRandomSubject();
-      const subject = Handlebars.compile(rawSubject)(hr);
-      const html = buildEmailFromContent(template.content, hr);
-
-      await queueService.publishEmail(bulkJob._id.toString(), {
-        userId,
-        email: hr.email,
-        subject,
-        html,
-        hr,
-      });
-      enqueuedCount++;
-    }
-    console.log(`📤 [User:${userId}] Successfully enqueued ${enqueuedCount} emails to queue email_queue_${userId}`);
-
-    // 6. Mark job status as PROCESSING
-    bulkJob.status = "PROCESSING";
-    await bulkJob.save();
-    console.log(`⚙️ [User:${userId}] BulkJob status updated to PROCESSING`);
-
-    // 7. Safe cleanup of intermediate XLS file
-    safeDelete(filePath);
-    console.log(`🧹 [User:${userId}] Cleaned up temporary Excel file`);
-
-    // 8. Return immediately with 202 Accepted response
-    console.log(`🎉 [User:${userId}] Campaign successfully initiated. Returning 202 to client.`);
-    return res.status(202).json({
+    // 8. Return immediately to prevent HTTP Gateway Timeouts (like Render's 30s limit)
+    console.log(`🎉 [User:${userId}] Returning immediate 202 to client. PDF extraction and enqueuing running in background...`);
+    res.status(202).json({
       success: true,
       message: "Bulk email sending campaign initiated",
       jobId: bulkJob._id,
       summary: {
-        total: hrList.length,
+        total: 0,
         sent: 0,
         failedCount: 0,
         coolDownCount: 0,
       },
     });
+
+    // 9. Run the PDF extraction and enqueuing asynchronously in the background
+    const pdfBuffer = req.file.buffer;
+    Promise.resolve().then(async () => {
+      let filePath = null;
+      try {
+        console.log(`📄 [User:${userId}] [Job:${bulkJob._id}] [BG] Starting PDF extraction...`);
+        filePath = await processPdfToExcel(pdfBuffer);
+        console.log(`📝 [User:${userId}] [Job:${bulkJob._id}] [BG] Extracted PDF data to temporary file: ${filePath}`);
+
+        // Read from the newly created XLSX
+        const hrList = readHRExcel(filePath);
+        console.log(`👥 [User:${userId}] [Job:${bulkJob._id}] [BG] Parsed contact list. Found ${hrList.length} HR contacts.`);
+
+        if (hrList.length === 0) {
+          throw new Error("No valid HR contacts found in the parsed Excel sheet.");
+        }
+
+        // Ensure the dynamic per-user sequential worker is started and listening
+        console.log(`👷 [User:${userId}] [Job:${bulkJob._id}] [BG] Checking if user worker is active...`);
+        await emailWorker.startUserWorker(userId);
+
+        // Update Job in MongoDB
+        bulkJob.totalCount = hrList.length;
+        bulkJob.pendingCount = hrList.length;
+        bulkJob.status = "PROCESSING";
+        await bulkJob.save();
+        console.log(`⚙️ [User:${userId}] [Job:${bulkJob._id}] [BG] Job status changed to PROCESSING. Count: ${hrList.length}`);
+
+        // Initialize Redis cache tracking state
+        await redisService.initJobProgress(bulkJob._id.toString(), {
+          totalCount: hrList.length,
+          status: "PROCESSING",
+        });
+        console.log(`🔋 [User:${userId}] [Job:${bulkJob._id}] [BG] Initialized Redis progress tracking`);
+
+        const getRandomSubject = () => {
+          const subjects = Array.isArray(template.subjects)
+            ? template.subjects.filter(Boolean)
+            : [];
+          if (subjects.length === 0) {
+            return template.name || "Job Opportunity";
+          }
+          const randomIndex = Math.floor(Math.random() * subjects.length);
+          return subjects[randomIndex];
+        };
+
+        // Enqueue each contact email task on RabbitMQ queue
+        console.log(`📥 [User:${userId}] [Job:${bulkJob._id}] [BG] Enqueuing ${hrList.length} contact emails to RabbitMQ...`);
+        let enqueuedCount = 0;
+        for (const hr of hrList) {
+          if (!hr.email) {
+            console.warn(`⏭️ [User:${userId}] [Job:${bulkJob._id}] [BG] Skipping HR contact (missing email):`, hr.name || "Unknown");
+            continue;
+          }
+          const rawSubject = getRandomSubject();
+          const subject = Handlebars.compile(rawSubject)(hr);
+          const html = buildEmailFromContent(template.content, hr);
+
+          await queueService.publishEmail(bulkJob._id.toString(), {
+            userId,
+            email: hr.email,
+            subject,
+            html,
+            hr,
+          });
+          enqueuedCount++;
+        }
+        console.log(`📤 [User:${userId}] [Job:${bulkJob._id}] [BG] Successfully enqueued ${enqueuedCount} emails to queue email_queue_${userId}`);
+
+        // Broadcast initial progress to Socket.IO so frontend UI updates
+        socketService.emitProgress(bulkJob._id.toString(), {
+          jobId: bulkJob._id.toString(),
+          _id: bulkJob._id.toString(),
+          totalCount: bulkJob.totalCount,
+          sentCount: 0,
+          failedCount: 0,
+          coolDownCount: 0,
+          pendingCount: bulkJob.totalCount,
+          percentage: 0,
+          status: "PROCESSING",
+          results: [],
+        });
+
+      } catch (bgErr) {
+        console.error(`❌ [User:${userId}] [Job:${bulkJob._id}] [BG] Error in background extraction/enqueue flow:`, bgErr.message);
+        
+        bulkJob.status = "FAILED";
+        bulkJob.results.push({
+          email: "System",
+          status: "FAILED",
+          reason: bgErr.message,
+        });
+        await bulkJob.save();
+
+        socketService.emitProgress(bulkJob._id.toString(), {
+          jobId: bulkJob._id.toString(),
+          _id: bulkJob._id.toString(),
+          totalCount: 0,
+          sentCount: 0,
+          failedCount: 1,
+          coolDownCount: 0,
+          pendingCount: 0,
+          percentage: 100,
+          status: "FAILED",
+          results: bulkJob.results,
+        });
+      } finally {
+        if (filePath) {
+          safeDelete(filePath);
+          console.log(`🧹 [User:${userId}] [Job:${bulkJob._id}] [BG] Cleaned up temporary Excel file`);
+        }
+      }
+    });
+
   } catch (err) {
     console.error(`❌ [User:${userId}] Error during sendBulkEmails flow:`, err);
     next(err);
