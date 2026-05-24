@@ -1,50 +1,64 @@
-# ---- Stage 1: Build ----
-FROM node:22-alpine AS builder
+# =============================================
+#  Stage 1 — Install dependencies (builder)
+# =============================================
+FROM node:22-alpine AS deps
 
-# Install native build tools required by bcrypt (node-gyp)
+# Native build tools for bcrypt (node-gyp)
 RUN apk add --no-cache python3 make g++
 
-# Install pnpm
-RUN corepack enable && corepack prepare pnpm@latest --activate
+# Enable pnpm via corepack (pinned version for reproducibility)
+RUN corepack enable && corepack prepare pnpm@10.12.1 --activate
 
 WORKDIR /app
 
-# Copy dependency manifests first for better layer caching
+# Copy only manifests first → maximises Docker layer cache hits
 COPY package.json pnpm-lock.yaml ./
 
-# Install production dependencies only
-RUN pnpm install --frozen-lockfile --prod
+# Install production deps only, skip optional & post-install scripts where safe
+RUN pnpm install --frozen-lockfile --prod --ignore-scripts \
+    && pnpm approve-builds bcrypt \
+    && pnpm rebuild bcrypt
 
-# ---- Stage 2: Runtime ----
-FROM node:22-alpine
+# =============================================
+#  Stage 2 — Production runtime (minimal)
+# =============================================
+FROM node:22-alpine AS runtime
 
-# Add labels
 LABEL maintainer="nikhilraj"
-LABEL description="Email Sender Backend Service"
+LABEL description="Email Sender Backend – Production"
 
-# Create non-root user for security
-RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+# ---- Security: non-root user ----
+RUN addgroup -S app && adduser -S app -G app
+
+# Install only the tiny runtime deps we need (wget for healthcheck, tini for PID 1)
+RUN apk add --no-cache wget tini
 
 WORKDIR /app
 
-# Copy node_modules from builder stage
-COPY --from=builder /app/node_modules ./node_modules
+# Copy production node_modules from builder (no dev deps, no build tools)
+COPY --from=deps --chown=app:app /app/node_modules ./node_modules
 
-# Copy application source code
-COPY . .
+# Copy application source
+COPY --chown=app:app . .
 
-# Create uploads and reports directories (used at runtime)
-RUN mkdir -p uploads reports && chown -R appuser:appgroup /app
+# Ensure runtime directories exist
+RUN mkdir -p uploads reports tmp
 
-# Switch to non-root user
-USER appuser
+# ---- Environment defaults ----
+ENV NODE_ENV=production
+ENV PORT=3000
 
-# Expose the application port
+# Drop privileges
+USER app
+
+# Expose the server port
 EXPOSE 3000
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://localhost:3000/ || exit 1
+# ---- Health check ----
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+  CMD wget -qO- http://localhost:3000/ || exit 1
 
-# Start the application (use node directly, not nodemon)
+# ---- Entrypoint ----
+# tini ensures proper signal forwarding & zombie reaping inside the container
+ENTRYPOINT ["tini", "--"]
 CMD ["node", "./bin/www"]

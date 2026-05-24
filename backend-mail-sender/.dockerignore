@@ -1,12 +1,37 @@
-node_modules
-npm-debug.log
-.env
+# Version control
 .git
+.gitignore
 .github
+
+# Environment & secrets (pass via -e or docker-compose)
+.env
+.env.*
+
+# Dependencies (rebuilt inside container)
+node_modules
+
+# IDE / Editor
 .vscode
+.idea
+*.swp
+*.swo
+
+# OS junk
 .DS_Store
-*.md
+Thumbs.db
+
+# Docker meta (don't recurse)
 Dockerfile
+docker-compose*.yml
 .dockerignore
-reports/*
+
+# Docs & logs
+*.md
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# Runtime artifacts (mounted as volumes in prod)
 uploads/*
+reports/*
+tmp/*
