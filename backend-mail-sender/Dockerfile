@@ -1,5 +1,5 @@
 # ---- Stage 1: Build ----
-FROM node:20-alpine AS builder
+FROM node:22-alpine AS builder
 
 # Install native build tools required by bcrypt (node-gyp)
 RUN apk add --no-cache python3 make g++
@@ -16,7 +16,7 @@ COPY package.json pnpm-lock.yaml ./
 RUN pnpm install --frozen-lockfile --prod
 
 # ---- Stage 2: Runtime ----
-FROM node:20-alpine
+FROM node:22-alpine
 
 # Add labels
 LABEL maintainer="nikhilraj"
