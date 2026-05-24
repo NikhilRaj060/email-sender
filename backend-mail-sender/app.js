@@ -47,14 +47,13 @@ app.set('view engine', 'jade');
 
 app.use(logger('dev'));
 
-// app.use(cors({
-//   origin: 'http://localhost:3001',
-//   credentials: true
-// }));
-
 app.use(cors({
-  origin: "*"
-}))
+  origin: [
+    "http://localhost:3001",
+    "https://email-sender-coral-two.vercel.app"
+  ],
+  credentials: true
+}));
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
