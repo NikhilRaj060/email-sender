@@ -13,7 +13,10 @@ const connectQueue = async () => {
       return;
     }
 
-    connection = await amqp.connect(process.env.RABBITMQ_URL);
+    connection = await amqp.connect(process.env.RABBITMQ_URL, {
+      heartbeat: 30,
+      timeout: 30000,
+    });
 
     channel = await connection.createChannel();
 
