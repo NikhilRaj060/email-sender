@@ -1,6 +1,9 @@
 # ---- Stage 1: Build ----
 FROM node:20-alpine AS builder
 
+# Install native build tools required by bcrypt (node-gyp)
+RUN apk add --no-cache python3 make g++
+
 # Install pnpm
 RUN corepack enable && corepack prepare pnpm@latest --activate
 
