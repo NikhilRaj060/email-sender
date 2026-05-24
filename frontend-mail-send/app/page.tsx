@@ -3,7 +3,7 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import {
   Mail, Zap, Shield, BarChart3, ArrowRight,
-  FileText, Send, RefreshCw, ChevronRight,
+  FileText, Send, RefreshCw,
 } from "lucide-react";
 
 const features = [

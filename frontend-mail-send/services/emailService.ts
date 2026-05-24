@@ -1,5 +1,5 @@
 import api from "@/lib/axios";
-import { SendEmailResponse, DailyStat } from "@/types";
+import { SendEmailResponse, DailyStat, BulkJob } from "@/types";
 
 export const emailService = {
   async sendBulkEmails(
@@ -28,12 +28,12 @@ export const emailService = {
     return data;
   },
 
-  async getLatestJob(): Promise<any> {
+  async getLatestJob(): Promise<BulkJob | null> {
     const { data } = await api.get("/api/email/job/latest");
     return data;
   },
 
-  async getJobStatus(jobId: string): Promise<any> {
+  async getJobStatus(jobId: string): Promise<BulkJob> {
     const { data } = await api.get(`/api/email/job/${jobId}`);
     return data;
   },

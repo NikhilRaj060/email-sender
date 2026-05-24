@@ -51,6 +51,7 @@ const startUserWorker = async (userId) => {
       const { email, subject, html, hr } = data;
 
       try {
+        console.log(`✉️ [User:${userIdStr}] [Job:${jobId}] Processing message for ${email} (Name: ${hr?.name || "N/A"}, Company: ${hr?.company || "N/A"})`);
         // 0. Guard: skip messages for jobs that no longer exist or are already completed
         const jobCheck = await BulkJob.findById(jobId);
         if (!jobCheck || jobCheck.status === "COMPLETED") {

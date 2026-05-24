@@ -85,7 +85,7 @@ export interface EmailResult {
 
 export interface SendEmailResponse {
   success: boolean;
-  fileCreated: string;
+  jobId: string; // Add jobId
   summary: {
     total: number;
     sent: number;
@@ -95,6 +95,26 @@ export interface SendEmailResponse {
   failedEmails: { email: string; reason: string }[];
   results: EmailResult[];
   finalReport: string;
+}
+
+export interface BulkJob {
+  _id: string;
+  jobId?: string;
+  userId?: string;
+  status: "PENDING" | "PROCESSING" | "COMPLETED" | "FAILED";
+  totalCount: number;
+  sentCount: number;
+  failedCount: number;
+  coolDownCount: number;
+  pendingCount: number;
+  percentage: number;
+  templateId?: string;
+  templateName?: string;
+  results: EmailResult[];
+  failedEmails?: { email: string; reason: string }[];
+  finalReport?: string | null;
+  completedAt?: string;
+  createdAt?: string;
 }
 
 // ─── Email Config ─────────────────────────────────────────────────────────────

@@ -5,8 +5,8 @@ import DashboardShell from "@/components/layout/DashboardShell";
 import { useTemplates } from "@/hooks/useTemplates";
 import { useSendEmails, useRetryEmails } from "@/hooks/useEmail";
 import { emailService } from "@/services/emailService";
-import { Upload, FileText, Send, RefreshCw, CheckCircle2, FileUp, ChevronDown, ChevronUp, AlertCircle } from "lucide-react";
-import { EmailResult } from "@/types";
+import { Upload, FileText, Send, RefreshCw, CheckCircle2, ChevronDown, ChevronUp } from "lucide-react";
+import { BulkJob, SendEmailResponse } from "@/types";
 import { io, Socket } from "socket.io-client";
 
 function StatusBadge({ status }: { status: string }) {
@@ -31,8 +31,8 @@ export default function SendPage() {
   const [expandedRow, setExpandedRow]           = useState<string | null>(null);
   const pdfRef                                  = useRef<HTMLInputElement>(null);
 
-  const [activeJob, setActiveJob]               = useState<any | null>(null);
-  const [socket, setSocket]                     = useState<Socket | null>(null);
+  const [activeJob, setActiveJob]               = useState<BulkJob | null>(null);
+  const socketRef                               = useRef<Socket | null>(null);
 
   const { data: templates, isLoading: tplLoading } = useTemplates();
   const sendMutation  = useSendEmails();
@@ -50,13 +50,20 @@ export default function SendPage() {
   }, []);
 
   // 2. Connect to Socket.IO when a job is active/processing
+  const activeJobId = activeJob?._id || activeJob?.jobId;
+  const activeJobStatus = activeJob?.status;
+
   useEffect(() => {
-    const jobId = activeJob?._id || activeJob?.jobId;
-    if (!activeJob || !jobId || (activeJob.status !== "PROCESSING" && activeJob.status !== "PENDING")) {
-      if (socket) {
-        socket.disconnect();
-        setSocket(null);
+    if (!activeJobId || (activeJobStatus !== "PROCESSING" && activeJobStatus !== "PENDING")) {
+      if (socketRef.current) {
+        socketRef.current.disconnect();
+        socketRef.current = null;
       }
+      return;
+    }
+
+    // Already connected to this socket, no need to reconnect
+    if (socketRef.current && socketRef.current.connected) {
       return;
     }
 
@@ -64,31 +71,32 @@ export default function SendPage() {
     const newSocket = io(socketUrl);
 
     newSocket.on("connect", () => {
-      console.log("🔌 Connected to Socket.IO backend for job:", jobId);
-      newSocket.emit("join-job", jobId);
+      console.log("🔌 Connected to Socket.IO backend for job:", activeJobId);
+      newSocket.emit("join-job", activeJobId);
     });
 
     newSocket.on("job-progress", (data) => {
       console.log("⚡ Live progress update received:", data);
       setActiveJob({
         ...data,
-        _id: data._id || data.jobId || jobId,
+        _id: data._id || data.jobId || activeJobId,
       });
     });
 
-    setSocket(newSocket);
+    socketRef.current = newSocket;
 
     return () => {
       newSocket.disconnect();
+      socketRef.current = null;
     };
-  }, [activeJob?._id || activeJob?.jobId, activeJob?.status]);
+  }, [activeJobId, activeJobStatus]);
 
   const handleSend = () => {
     if (!pdfFile) return;
     sendMutation.mutate(
       { pdf: pdfFile, templateId: selectedTemplateId || undefined },
       {
-        onSuccess: (data: any) => {
+        onSuccess: (data: SendEmailResponse) => {
           // Immediately set job progress panel to pending/started state
           setActiveJob({
             _id: data.jobId,
@@ -228,7 +236,7 @@ export default function SendPage() {
         {/* Trigger Send Button */}
         <button
           onClick={handleSend}
-          disabled={!pdfFile || sendMutation.isPending || (activeJob && (activeJob.status === "PROCESSING" || activeJob.status === "PENDING"))}
+          disabled={!pdfFile || sendMutation.isPending || !!(activeJob && (activeJob.status === "PROCESSING" || activeJob.status === "PENDING"))}
           className="btn btn-primary"
           style={{ width: "100%", justifyContent: "center", padding: "13px", fontSize: 14, borderRadius: "var(--r-lg)" }}
         >
@@ -331,7 +339,7 @@ export default function SendPage() {
                         </tr>
                       </thead>
                       <tbody>
-                        {(activeJob.results || []).map((r: any, i: number) => (
+                        {(activeJob.results || []).map((r, i) => (
                           <>
                             <tr
                               key={i}

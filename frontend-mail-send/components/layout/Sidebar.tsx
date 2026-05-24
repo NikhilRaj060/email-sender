@@ -73,7 +73,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
             className="mobile-close-btn"
             style={{
               background:"none", border:"none", cursor:"pointer",
-              color:"var(--text-muted)", padding:4, display:"flex",
+              color:"var(--text-muted)", padding:4,
               alignItems:"center", justifyContent:"center", borderRadius:6,
             }}
           >

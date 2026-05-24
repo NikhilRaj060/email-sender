@@ -3,10 +3,11 @@ const mongoose = require("mongoose");
 const ResumeSchema = new mongoose.Schema(
   {
     filename: { type: String, required: true },
-    path: { type: String, required: true },
     originalName: String,
     mimeType: String,
     size: Number,
+    // Store the actual PDF binary in MongoDB so it works in Docker/serverless
+    data: { type: Buffer, required: true },
     userId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",

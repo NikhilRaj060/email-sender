@@ -11,7 +11,7 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     // Check if store has already hydrated
     if (useAuthStore.persist.hasHydrated()) {
-      setIsHydrated(true);
+      Promise.resolve().then(() => setIsHydrated(true));
     } else {
       const unsub = useAuthStore.persist.onFinishHydration(() => {
         setIsHydrated(true);
