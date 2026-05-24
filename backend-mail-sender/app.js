@@ -75,6 +75,10 @@ app.use(function(req, res, next) {
   next(createError(404));
 });
 
+app.get("/", (req, res) => {
+  res.send("Backend Running");
+});
+
 // global error handler (API + UI safe)
 app.use(function(err, req, res, next) {
   console.error(err.stack);
