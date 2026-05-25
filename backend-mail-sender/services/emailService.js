@@ -113,6 +113,7 @@ exports.sendEmail = async ({
 
     return { status: "SENT" };
   } catch (err) {
+    console.error(`❌ [User:${userId}] [Recipient:${to}] SMTP Dispatch Failure details:`, err);
     // Evict broken transporter from active memory cache to prevent cascade failures on subsequent emails
     closeAndEvictTransporter(userId);
 

@@ -50,9 +50,9 @@ exports.getTransporterForUser = async (userId) => {
     pool: true,
     maxConnections: 1,      // Sequentially reuse exactly 1 active SMTP connection
     maxMessages: Infinity,  // Keep connection alive for all messages
-    connectionTimeout: 20000,
-    greetingTimeout: 20000,
-    socketTimeout: 20000,
+    connectionTimeout: 10000,
+    greetingTimeout: 10000,
+    socketTimeout: 10000,
   });
 
   transporterCache.set(userIdStr, {
