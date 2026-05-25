@@ -37,4 +37,9 @@ export const emailService = {
     const { data } = await api.get(`/api/email/job/${jobId}`);
     return data;
   },
+
+  async cancelJob(jobId: string): Promise<{ success: boolean; message: string }> {
+    const { data } = await api.post(`/api/email/job/${jobId}/cancel`);
+    return data;
+  },
 };

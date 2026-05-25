@@ -3,7 +3,7 @@ import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import DashboardShell from "@/components/layout/DashboardShell";
 import { useTemplates } from "@/hooks/useTemplates";
-import { useSendEmails, useRetryEmails } from "@/hooks/useEmail";
+import { useSendEmails, useRetryEmails, useCancelEmail } from "@/hooks/useEmail";
 import { emailService } from "@/services/emailService";
 import { Upload, FileText, Send, RefreshCw, CheckCircle2, ChevronDown, ChevronUp } from "lucide-react";
 import { BulkJob, SendEmailResponse } from "@/types";
@@ -17,6 +17,7 @@ function StatusBadge({ status }: { status: string }) {
     SKIPPED:  "badge-skipped",
     PENDING:  "badge-skipped",
     PROCESSING: "badge-cooldown",
+    CANCELLED: "badge-failed", // Map Cancelled badge style to red/failed
   };
   return (
     <span className={`badge badge-dot ${map[status] || "badge-skipped"}`}>
@@ -37,6 +38,7 @@ export default function SendPage() {
   const { data: templates, isLoading: tplLoading } = useTemplates();
   const sendMutation  = useSendEmails();
   const retryMutation = useRetryEmails();
+  const cancelMutation = useCancelEmail();
 
   // 1. Fetch latest bulk job on mount to restore state if a refresh occurred
   useEffect(() => {
@@ -272,9 +274,29 @@ export default function SendPage() {
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <div>
                   <h3 style={{ color: "var(--text-primary)", fontSize: 15, fontWeight: 600 }}>Active Email Campaign Progress</h3>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 4 }}>
                     <span style={{ fontSize: 12.5, color: "var(--text-muted)" }}>Status:</span>
                     <StatusBadge status={activeJob.status} />
+                    {(activeJob.status === "PROCESSING" || activeJob.status === "PENDING") && (
+                      <button
+                        onClick={() => cancelMutation.mutate(activeJob._id || activeJob.jobId || "latest")}
+                        disabled={cancelMutation.isPending}
+                        className="btn btn-secondary btn-sm"
+                        style={{
+                          borderColor: "rgba(239, 68, 68, 0.35)",
+                          color: "#f87171",
+                          fontSize: 11,
+                          padding: "2px 8px",
+                          borderRadius: 6,
+                          cursor: "pointer",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          height: 22,
+                        }}
+                      >
+                        {cancelMutation.isPending ? "Stopping..." : "Stop Campaign"}
+                      </button>
+                    )}
                   </div>
                 </div>
                 <span style={{ fontSize: 24, fontWeight: 700, color: "var(--text-accent)" }}>

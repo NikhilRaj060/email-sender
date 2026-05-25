@@ -20,5 +20,6 @@ router.get("/stats/daily", verifyToken, emailControler.getDailyEmailStats);
 // ─── Bulk Job tracking routes ──────────────────────────────────────────────────
 router.get("/job/latest", verifyToken, emailControler.getLatestBulkJob);
 router.get("/job/:jobId", verifyToken, emailControler.getBulkJobStatus);
+router.post("/job/:jobId/cancel", verifyToken, emailControler.cancelBulkJob);
 
 module.exports = router;

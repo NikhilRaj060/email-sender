@@ -39,3 +39,15 @@ export function useRetryEmails() {
     onError: (err: { message: string }) => toast.error(err.message),
   });
 }
+
+export function useCancelEmail() {
+  return useMutation({
+    mutationFn: (jobId: string) => emailService.cancelJob(jobId),
+    onSuccess: (data) => {
+      toast.success(data.message || "Campaign stopped successfully");
+    },
+    onError: (err: { message: string }) => {
+      toast.error(err.message || "Failed to stop campaign");
+    },
+  });
+}

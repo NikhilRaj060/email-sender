@@ -15,7 +15,7 @@ const BulkJobSchema = new mongoose.Schema(
     coolDownCount: { type: Number, default: 0 },
     status: {
       type: String,
-      enum: ["PENDING", "PROCESSING", "COMPLETED", "FAILED"],
+      enum: ["PENDING", "PROCESSING", "COMPLETED", "FAILED", "CANCELLED"],
       default: "PENDING",
     },
     percentage: { type: Number, default: 0 },

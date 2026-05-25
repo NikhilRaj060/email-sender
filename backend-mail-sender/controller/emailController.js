@@ -399,10 +399,75 @@ const getDailyEmailStats = async (req, res, next) => {
   }
 };
 
+const cancelBulkJob = async (req, res, next) => {
+  try {
+    const userId = req.currentUserId;
+    const { jobId } = req.params;
+    console.log(`⏹️ [User:${userId}] Received cancellation request for job: ${jobId}`);
+
+    let job;
+    if (jobId === "latest") {
+      job = await BulkJob.findOne({ userId }).sort({ createdAt: -1 });
+    } else {
+      job = await BulkJob.findOne({ _id: jobId, userId });
+    }
+
+    if (!job) {
+      console.warn(`⚠️ [User:${userId}] Cancel failed: Job not found`);
+      return res.status(404).json({ success: false, message: "No active email campaign found to cancel." });
+    }
+
+    if (job.status === "COMPLETED" || job.status === "CANCELLED" || job.status === "FAILED") {
+      console.log(`ℹ️ [User:${userId}] Cancel skipped: Job already finished with status ${job.status}`);
+      return res.status(400).json({ success: false, message: `Campaign is already ${job.status.toLowerCase()}` });
+    }
+
+    // 1. Purge the user's queue in RabbitMQ to stop further dispatches
+    console.log(`🧹 [User:${userId}] Purging queue for active campaign...`);
+    await queueService.purgeUserQueue(userId);
+
+    // 2. Update job status to CANCELLED in database
+    job.status = "CANCELLED";
+    await job.save();
+    console.log(`✅ [User:${userId}] Job ${job._id} successfully marked as CANCELLED`);
+
+    // 3. Update Redis progress state to CANCELLED
+    const redisClient = redisService.getClient();
+    if (redisClient) {
+      const key = `job:progress:${job._id}`;
+      await redisClient.hSet(key, "status", "CANCELLED");
+    }
+
+    // 4. Emit live update via Socket.IO
+    socketService.emitProgress(job._id.toString(), {
+      jobId: job._id.toString(),
+      _id: job._id.toString(),
+      totalCount: job.totalCount,
+      sentCount: job.sentCount,
+      failedCount: job.failedCount,
+      coolDownCount: job.coolDownCount,
+      pendingCount: 0,
+      percentage: job.percentage,
+      status: "CANCELLED",
+      results: job.results,
+    });
+
+    res.json({
+      success: true,
+      message: "Email sending campaign successfully stopped",
+      jobId: job._id,
+    });
+  } catch (err) {
+    console.error(`❌ [User:${req.currentUserId}] Error cancelling bulk job:`, err);
+    next(err);
+  }
+};
+
 module.exports = {
   sendBulkEmails,
   retryFailedEmails,
   getDailyEmailStats,
   getLatestBulkJob,
   getBulkJobStatus,
+  cancelBulkJob,
 };
