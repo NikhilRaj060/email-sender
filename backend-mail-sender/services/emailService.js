@@ -1,5 +1,6 @@
 const EmailLog = require("../models/EmailLog");
 const dayjs = require("dayjs");
+const { closeAndEvictTransporter } = require("../config/mailTransport");
 
 exports.sendEmail = async ({
   transporter,
@@ -89,7 +90,7 @@ exports.sendEmail = async ({
     let timeoutId;
     const timeoutPromise = new Promise((_, reject) => {
       timeoutId = setTimeout(() => {
-        try { transporter.close(); } catch (_) {}
+        closeAndEvictTransporter(userId);
         reject(new Error("Timeout after 20 seconds"));
       }, 20000);
     });
@@ -112,6 +113,9 @@ exports.sendEmail = async ({
 
     return { status: "SENT" };
   } catch (err) {
+    // Evict broken transporter from active memory cache to prevent cascade failures on subsequent emails
+    closeAndEvictTransporter(userId);
+
     await EmailLog.findOneAndUpdate(
       { email: to, userId },
       {

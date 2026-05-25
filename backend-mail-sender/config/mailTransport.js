@@ -65,3 +65,16 @@ exports.getTransporterForUser = async (userId) => {
     fromEmail: config.fromEmail,
   };
 };
+
+exports.closeAndEvictTransporter = (userId) => {
+  if (!userId) return;
+  const userIdStr = userId.toString();
+  if (transporterCache.has(userIdStr)) {
+    console.log(`🔌 [User:${userIdStr}] Evicting closed/failed SMTP transporter from pool cache...`);
+    const cached = transporterCache.get(userIdStr);
+    try {
+      cached.transporter.close();
+    } catch (_) {}
+    transporterCache.delete(userIdStr);
+  }
+};
